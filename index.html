@@ -53,7 +53,6 @@
             box-sizing: border-box; font-family: 'Malgun Gothic', sans-serif; background-color: #fcfcfc;
         }
 
-        /* 파일 리스트 영역 스타일 추가 */
         #fileList {
             text-align: left;
             margin-bottom: 1.2rem;
@@ -65,9 +64,8 @@
             overflow-y: auto;
             font-size: 0.85rem;
             color: #666;
-            display: none; /* 초기에는 숨김 */
+            display: none;
         }
-        #fileList div { padding: 2px 0; border-bottom: 1px dashed #eee; }
 
         button {
             width: 100%; padding: 14px; color: white; border: none; border-radius: 8px;
@@ -89,7 +87,7 @@
 <div class="main-wrapper">
     <div class="container">
         <div><span class="badge badge-blue">Utility</span></div>
-        <h2>📑 엑셀 요약 행 합치기</h2>
+        <h2>📑 엑셀 반복 병합기</h2>
         
         <div class="form-group">
             <label for="excelFiles">.xlsx 파일 선택 (다중 선택)</label>
@@ -113,7 +111,6 @@
         const btn = document.getElementById('processBtn');
         const statusDiv = document.getElementById('statusMsg');
 
-        // FileList -> Array 변환
         selectedFiles = Array.from(fileInput.files);
 
         if (selectedFiles.length === 0) {
@@ -127,25 +124,24 @@
         // 파일명 기준 오름차순 정렬 (그룹A -> 그룹B -> 그룹C)
         selectedFiles.sort((a, b) => a.name.localeCompare(b.name));
 
-        // 목록 표시
         listDiv.style.display = 'block';
         listDiv.innerHTML = "<b>선택된 파일 (" + selectedFiles.length + "개):</b><br>" + 
-                            selectedFiles.map(f => "📄 " + f.name).join("<br>"); // div 대신 br로 간단히 처리
+                            selectedFiles.map(f => "📄 " + f.name).join("<br>");
 
-        // 버튼 활성화
         btn.disabled = false;
         btn.classList.remove('btn-disabled');
         statusDiv.innerHTML = "준비 완료 (" + selectedFiles.length + "개 파일)";
     }
 
-    // 엑셀 스타일 적용 함수 (보내주신 코드의 스타일 로직 활용)
+    // 스타일 적용 (짝수 행은 헤더 스타일, 홀수 행은 데이터 스타일)
     function applyStyle(ws) {
         const range = XLSX.utils.decode_range(ws['!ref']);
         
-        // 컬럼 너비 설정 (대략적으로 맞춤)
+        // 컬럼 너비 설정
         ws['!cols'] = [
-            {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, 
-            {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}
+            {wch: 25}, {wch: 15}, {wch: 18}, {wch: 18},
+            {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, 
+            {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}
         ];
 
         for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -155,7 +151,7 @@
 
                 let style = {
                     font: { name: "맑은 고딕", sz: 11 },
-                    alignment: { vertical: "center", horizontal: "center" }, // 기본 가운데 정렬
+                    alignment: { vertical: "center", horizontal: "center" },
                     border: {
                         top: { style: "thin", color: { rgb: "D3D3D3" } },
                         bottom: { style: "thin", color: { rgb: "D3D3D3" } },
@@ -164,16 +160,18 @@
                     }
                 };
 
-                // 헤더 (첫 번째 행) 스타일
-                if (R === 0) {
+                // [중요] 짝수 행(0, 2, 4...)은 헤더로 간주 -> 회색 배경
+                if (R % 2 === 0) {
                     style.font.bold = true;
-                    style.fill = { fgColor: { rgb: "F2F2F2" } };
+                    style.fill = { fgColor: { rgb: "F2F2F2" } }; // 회색 배경
+                    style.alignment.horizontal = "center";
                 } else {
-                    // 데이터 행 스타일
-                    // 숫자 데이터(돈 관련)는 우측 정렬이 보기에 좋음
-                    // 3열(인덱스 3)부터는 숫자로 가정하고 우측 정렬
-                    if (C >= 3) { 
+                    // 홀수 행(1, 3, 5...)은 데이터 -> 흰 배경
+                    // 파일명(0번 컬럼)은 왼쪽 정렬, 숫자는 오른쪽 정렬
+                    if (C >= 4) { 
                         style.alignment.horizontal = "right";
+                    } else if (C === 0) {
+                        style.alignment.horizontal = "left";
                     }
                 }
                 ws[cellAddress].s = style;
@@ -181,62 +179,57 @@
         }
     }
 
-    // 병합 로직
+    // 병합 로직 (헤더 반복 추가)
     async function mergeSummaries() {
         const statusDiv = document.getElementById('statusMsg');
         statusDiv.innerText = "처리 중...";
 
         try {
             let finalData = [];
-            let headerAdded = false;
 
-            // 순차적으로 파일 읽기
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data, { type: 'array' });
-                
-                // 첫 번째 시트 가져오기
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // 데이터 추출 (헤더 포함)
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                // 데이터 유효성 검사 (최소 2줄 이상이어야 요약 행이 존재)
-                if (jsonData.length < 2) {
-                    console.warn(file.name + " 파일에 데이터가 부족합니다. 스킵합니다.");
-                    continue;
-                }
+                if (jsonData.length < 2) continue;
 
-                // 1. 헤더 추가 (첫 번째 파일일 경우에만)
-                if (!headerAdded) {
-                    finalData.push(jsonData[0]); // 1행(헤더)
-                    headerAdded = true;
-                }
+                // 1. 헤더 가져오기 (각 파일마다 가져옴)
+                let headerRow = [...jsonData[0]]; // 복사
+                headerRow.unshift("파일명"); // 맨 앞에 '파일명' 컬럼 추가
 
-                // 2. 요약 데이터 (2행) 추출 및 추가
-                // 파일명을 맨 앞에 붙이고 싶다면 아래 주석 해제:
-                // let rowData = jsonData[1];
-                // rowData.unshift(file.name); 
+                // 2. 데이터 가져오기 (2행)
+                let dataRow = [...jsonData[1]]; // 복사
                 
-                finalData.push(jsonData[1]); 
+                // 데이터 정제 (숫자 변환)
+                dataRow = dataRow.map(cell => {
+                    if (typeof cell === 'string' && cell.includes("-")) return cell; // 날짜 등 제외
+                    return isNaN(Number(cell)) ? cell : Number(cell);
+                });
+
+                // 맨 앞에 현재 파일명 추가
+                dataRow.unshift(file.name.replace(".xlsx", "").replace(".csv", ""));
+
+                // [핵심] 헤더 넣고 -> 데이터 넣고 (계속 반복)
+                finalData.push(headerRow);
+                finalData.push(dataRow);
             }
 
-            if (finalData.length < 2) {
-                throw new Error("추출할 데이터가 없습니다.");
+            if (finalData.length === 0) {
+                throw new Error("처리할 데이터가 없습니다.");
             }
 
-            // 워크북 생성
             const newWorkbook = XLSX.utils.book_new();
             const newWorksheet = XLSX.utils.aoa_to_sheet(finalData);
 
-            // 스타일 적용
             applyStyle(newWorksheet);
 
-            // 시트 추가 및 다운로드
-            XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "전체통합요약");
-            XLSX.writeFile(newWorkbook, "전체그룹_요약결과.xlsx");
+            XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "전체통합결과");
+            XLSX.writeFile(newWorkbook, "전체그룹_반복요약.xlsx");
 
             statusDiv.innerHTML = "<span class='success'>✅ 다운로드 완료!</span>";
 
