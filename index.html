@@ -3,192 +3,246 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>엑셀 요약 행 합치기 도구</title>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <title>그룹 요약 통합 도구 (Pro)</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.min.js"></script>
     <style>
         body {
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f0f2f5;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
         }
+        
+        .main-wrapper {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+
         .container {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 400px;
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            width: 450px;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
         }
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
+        
+        .container:hover { transform: translateY(-5px); }
+
+        h2 { margin-bottom: 1.5rem; color: #333; font-weight: 700; font-size: 1.5rem; }
+        
+        .badge { 
+            display: inline-block; padding: 4px 12px; border-radius: 20px; 
+            font-size: 0.8rem; margin-bottom: 10px; color: white; font-weight: bold;
         }
-        .file-input-wrapper {
-            margin-bottom: 20px;
-        }
+        .badge-blue { background-color: #007bff; }
+
+        .form-group { margin-bottom: 1.2rem; text-align: left; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #555; }
+        
         input[type="file"] {
-            display: none;
+            width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;
+            box-sizing: border-box; font-family: 'Malgun Gothic', sans-serif; background-color: #fcfcfc;
         }
-        .custom-file-upload {
-            border: 2px dashed #ccc;
-            display: inline-block;
-            padding: 12px 24px;
-            cursor: pointer;
-            width: 100%;
-            box-sizing: border-box;
-            border-radius: 5px;
-            color: #666;
-            transition: all 0.3s;
-        }
-        .custom-file-upload:hover {
-            border-color: #4F46E5;
-            color: #4F46E5;
-            background-color: #EEF2FF;
-        }
-        button {
-            background-color: #4F46E5;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #4338ca;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
+
+        /* 파일 리스트 영역 스타일 추가 */
         #fileList {
             text-align: left;
-            margin-bottom: 20px;
-            font-size: 14px;
-            color: #555;
-            max-height: 100px;
+            margin-bottom: 1.2rem;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #eee;
+            max-height: 120px;
             overflow-y: auto;
+            font-size: 0.85rem;
+            color: #666;
+            display: none; /* 초기에는 숨김 */
         }
-        .status {
-            margin-top: 15px;
-            font-size: 14px;
-            color: #059669;
-            font-weight: bold;
+        #fileList div { padding: 2px 0; border-bottom: 1px dashed #eee; }
+
+        button {
+            width: 100%; padding: 14px; color: white; border: none; border-radius: 8px;
+            font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: background 0.3s;
+            font-family: 'Malgun Gothic', sans-serif; margin-top: auto;
         }
+        
+        .btn-blue { background-color: #007bff; }
+        .btn-blue:hover { background-color: #0056b3; }
+        .btn-disabled { background-color: #ccc; cursor: not-allowed; }
+
+        .status-msg { margin-top: 1rem; font-size: 0.9rem; color: #666; min-height: 20px; }
+        .success { color: #28a745 !important; font-weight: bold; }
+        .error { color: #dc3545 !important; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>엑셀 요약 합치기</h2>
-    <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
-        그룹A, B, C 파일을 한꺼번에 선택하세요.<br>
-        각 파일의 <b>2번째 행(요약)</b>만 모아서 저장합니다.
-    </p>
+<div class="main-wrapper">
+    <div class="container">
+        <div><span class="badge badge-blue">Utility</span></div>
+        <h2>📑 엑셀 요약 행 합치기</h2>
+        
+        <div class="form-group">
+            <label for="excelFiles">.xlsx 파일 선택 (다중 선택)</label>
+            <input type="file" id="excelFiles" accept=".xlsx, .csv" multiple onchange="handleFileSelect()">
+        </div>
 
-    <div class="file-input-wrapper">
-        <label for="fileInput" class="custom-file-upload">
-            📂 파일 선택하기 (여러개 가능)
-        </label>
-        <input type="file" id="fileInput" multiple accept=".xlsx, .xls, .csv">
+        <div id="fileList"></div>
+
+        <button id="processBtn" class="btn-blue btn-disabled" onclick="mergeSummaries()" disabled>병합 및 다운로드</button>
+        <div id="statusMsg" class="status-msg">파일을 선택해주세요.</div>
     </div>
-
-    <div id="fileList">선택된 파일 없음</div>
-
-    <button id="processBtn" onclick="mergeFiles()" disabled>요약 파일 다운로드</button>
-    <div id="statusMsg" class="status"></div>
 </div>
 
 <script>
     let selectedFiles = [];
 
-    // 파일 선택 시 이벤트 리스너
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        // FileList를 배열로 변환
-        selectedFiles = Array.from(e.target.files);
-        
-        // 파일명 기준 오름차순 정렬 (그룹A -> 그룹B -> 그룹C 순서 보장)
-        selectedFiles.sort((a, b) => a.name.localeCompare(b.name));
-
+    // 파일 선택 핸들러
+    function handleFileSelect() {
+        const fileInput = document.getElementById('excelFiles');
         const listDiv = document.getElementById('fileList');
         const btn = document.getElementById('processBtn');
+        const statusDiv = document.getElementById('statusMsg');
 
-        if (selectedFiles.length > 0) {
-            listDiv.innerHTML = "<b>선택된 파일 (" + selectedFiles.length + "개):</b><br>" + 
-                                selectedFiles.map(f => "📄 " + f.name).join("<br>");
-            btn.disabled = false;
-        } else {
-            listDiv.innerText = "선택된 파일 없음";
+        // FileList -> Array 변환
+        selectedFiles = Array.from(fileInput.files);
+
+        if (selectedFiles.length === 0) {
+            listDiv.style.display = 'none';
             btn.disabled = true;
+            btn.classList.add('btn-disabled');
+            statusDiv.innerHTML = "파일을 선택해주세요.";
+            return;
         }
-    });
 
-    async function mergeFiles() {
-        const statusMsg = document.getElementById('statusMsg');
-        statusMsg.innerText = "처리 중...";
+        // 파일명 기준 오름차순 정렬 (그룹A -> 그룹B -> 그룹C)
+        selectedFiles.sort((a, b) => a.name.localeCompare(b.name));
+
+        // 목록 표시
+        listDiv.style.display = 'block';
+        listDiv.innerHTML = "<b>선택된 파일 (" + selectedFiles.length + "개):</b><br>" + 
+                            selectedFiles.map(f => "📄 " + f.name).join("<br>"); // div 대신 br로 간단히 처리
+
+        // 버튼 활성화
+        btn.disabled = false;
+        btn.classList.remove('btn-disabled');
+        statusDiv.innerHTML = "준비 완료 (" + selectedFiles.length + "개 파일)";
+    }
+
+    // 엑셀 스타일 적용 함수 (보내주신 코드의 스타일 로직 활용)
+    function applyStyle(ws) {
+        const range = XLSX.utils.decode_range(ws['!ref']);
         
+        // 컬럼 너비 설정 (대략적으로 맞춤)
+        ws['!cols'] = [
+            {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, 
+            {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}
+        ];
+
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                if (!ws[cellAddress]) continue;
+
+                let style = {
+                    font: { name: "맑은 고딕", sz: 11 },
+                    alignment: { vertical: "center", horizontal: "center" }, // 기본 가운데 정렬
+                    border: {
+                        top: { style: "thin", color: { rgb: "D3D3D3" } },
+                        bottom: { style: "thin", color: { rgb: "D3D3D3" } },
+                        left: { style: "thin", color: { rgb: "D3D3D3" } },
+                        right: { style: "thin", color: { rgb: "D3D3D3" } }
+                    }
+                };
+
+                // 헤더 (첫 번째 행) 스타일
+                if (R === 0) {
+                    style.font.bold = true;
+                    style.fill = { fgColor: { rgb: "F2F2F2" } };
+                } else {
+                    // 데이터 행 스타일
+                    // 숫자 데이터(돈 관련)는 우측 정렬이 보기에 좋음
+                    // 3열(인덱스 3)부터는 숫자로 가정하고 우측 정렬
+                    if (C >= 3) { 
+                        style.alignment.horizontal = "right";
+                    }
+                }
+                ws[cellAddress].s = style;
+            }
+        }
+    }
+
+    // 병합 로직
+    async function mergeSummaries() {
+        const statusDiv = document.getElementById('statusMsg');
+        statusDiv.innerText = "처리 중...";
+
         try {
             let finalData = [];
-            let isHeaderAdded = false;
+            let headerAdded = false;
 
+            // 순차적으로 파일 읽기
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
                 const data = await file.arrayBuffer();
-                
-                // 엑셀/CSV 파일 읽기
                 const workbook = XLSX.read(data, { type: 'array' });
                 
                 // 첫 번째 시트 가져오기
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // 시트 데이터를 JSON 배열로 변환 (헤더 포함)
+                // 데이터 추출 (헤더 포함)
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                // 데이터 검증: 최소 2행 이상이어야 함 (1행:헤더, 2행:요약데이터)
+                // 데이터 유효성 검사 (최소 2줄 이상이어야 요약 행이 존재)
                 if (jsonData.length < 2) {
-                    console.warn(`파일 ${file.name}에 데이터가 충분하지 않습니다.`);
+                    console.warn(file.name + " 파일에 데이터가 부족합니다. 스킵합니다.");
                     continue;
                 }
 
-                // 1. 헤더 추가 (첫 번째 파일에서만 가져옴)
-                if (!isHeaderAdded) {
-                    // 원본 그대로 헤더 추가
-                    finalData.push(jsonData[0]); 
-                    isHeaderAdded = true;
+                // 1. 헤더 추가 (첫 번째 파일일 경우에만)
+                if (!headerAdded) {
+                    finalData.push(jsonData[0]); // 1행(헤더)
+                    headerAdded = true;
                 }
 
-                // 2. 요약 데이터(2행, 인덱스 1) 추출하여 추가
-                let summaryRow = jsonData[1];
+                // 2. 요약 데이터 (2행) 추출 및 추가
+                // 파일명을 맨 앞에 붙이고 싶다면 아래 주석 해제:
+                // let rowData = jsonData[1];
+                // rowData.unshift(file.name); 
                 
-                // (선택사항) 만약 A행 앞에 파일명을 넣고 싶다면 아래 주석 해제
-                // summaryRow.unshift(file.name); 
-                
-                finalData.push(summaryRow);
+                finalData.push(jsonData[1]); 
             }
 
-            // 새로운 워크북 생성
+            if (finalData.length < 2) {
+                throw new Error("추출할 데이터가 없습니다.");
+            }
+
+            // 워크북 생성
             const newWorkbook = XLSX.utils.book_new();
             const newWorksheet = XLSX.utils.aoa_to_sheet(finalData);
 
-            // 시트 추가
-            XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "전체요약");
+            // 스타일 적용
+            applyStyle(newWorksheet);
 
-            // 파일 다운로드
-            XLSX.writeFile(newWorkbook, "전체그룹_통합요약.xlsx");
-            
-            statusMsg.innerText = "✅ 다운로드 완료!";
+            // 시트 추가 및 다운로드
+            XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "전체통합요약");
+            XLSX.writeFile(newWorkbook, "전체그룹_요약결과.xlsx");
+
+            statusDiv.innerHTML = "<span class='success'>✅ 다운로드 완료!</span>";
 
         } catch (error) {
             console.error(error);
-            statusMsg.innerText = "❌ 오류 발생: " + error.message;
-            statusMsg.style.color = "red";
+            statusDiv.innerHTML = "<span class='error'>오류 발생: " + error.message + "</span>";
         }
     }
 </script>
